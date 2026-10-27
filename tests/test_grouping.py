@@ -677,3 +677,26 @@ def test_grouping_as_cte():
 def test_grouping_create_table():
     p = sqlparse.parse("create table db.tbl (a string)")[0].tokens
     assert p[4].value == "db.tbl"
+
+
+@pytest.mark.parametrize('s', [
+    pytest.param('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1', id='[QP-QTPY-1-1] groups an aliased function when AS is lowercase'),
+])
+def test_grouping_ctas_lowercase_as_alias(s):
+    p = sqlparse.parse(s)[0]
+    assert p.tokens[10].get_alias() == 'col1'
+    assert isinstance(p.tokens[10].tokens[0], sql.Function)
+    assert str(p.tokens[10].tokens[0]) == 'coalesce(t1.col1, 0)'
+
+
+@pytest.mark.parametrize('case', [
+    pytest.param(None, id='[QP-QTPY-1-2] groups lowercase and uppercase AS statements the same way'),
+])
+def test_grouping_ctas_as_case_insensitive(case):
+    lower = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0]
+    upper = sqlparse.parse('CREATE TABLE tbl1 AS SELECT coalesce(t1.col1, 0) AS col1 FROM t1')[0]
+    for p in (lower, upper):
+        assert p.tokens[10].get_alias() == 'col1'
+        assert isinstance(p.tokens[10].tokens[0], sql.Function)
+        assert str(p.tokens[10].tokens[0]) == 'coalesce(t1.col1, 0)'
+    assert [type(t) for t in lower.tokens] == [type(t) for t in upper.tokens]
