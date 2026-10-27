@@ -1,0 +1,145 @@
+# ============================================================================
+# QuikPilot — GENERATED FILE. Do not edit by hand.
+#
+# The "Run QuikPilot" step below runs a small, version-pinned tool we publish
+# publicly: https://www.npmjs.com/package/@quikit/quikpilot-runner — read its
+# source any time. It fetches this run's work packet, runs your setup/lint/test
+# commands, reports results to QuikTest, enforces the denied-path guardrail,
+# commits, pushes, and reports back to QuikTrack. The version is pinned exactly
+# (never a floating tag) so a new release only reaches you through a new pull
+# request here, same as any other change to this file.
+#
+# This file lives in YOUR repository, so QuikIT cannot update it. Any change
+# arrives as a new pull request.
+#
+# templateVersion: 9
+# toolchains: python@3.12
+# project: cmvqcatkm00a4td0wp6mzo86f
+# ============================================================================
+name: QuikPilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: QuikPilot run id
+        required: true
+      callback_url:
+        description: Where QuikPilot expects the result
+        required: true
+      packet_url:
+        description: Where to fetch this run's work packet
+        required: true
+      token_url:
+        description: Where to exchange a GitHub OIDC token for a QuikPilot run token
+        required: true
+      installation_token_url:
+        description: Where to exchange the run token for a repo-scoped GitHub push credential
+        required: true
+      mode:
+        description: '"run" (default) for a pilot run, or "readiness_check" to only run setup/test and report whether a JUnit report was produced'
+        required: false
+        default: run
+      readiness_token:
+        description: Readiness-check mode only — bearer token for READINESS_CALLBACK_URL
+        required: false
+      readiness_callback_url:
+        description: Readiness-check mode only — where to report the dry-run result
+        required: false
+      setup_cmd:
+        description: Readiness-check mode only — this project's setup command
+        required: false
+      test_cmd:
+        description: Readiness-check mode only — this project's test command
+        required: false
+
+# Two dispatches for one run must never race.
+concurrency:
+  group: quikpilot-${{ inputs.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  # Read only — checkout is all the ambient token does now. The push itself
+  # uses a separately-minted, repo-scoped installation token (QUIKTR-804,
+  # D16): a push authored by the ambient token never triggered the
+  # customer's own `on: push` CI, which was the entire reason D16 existed.
+  contents: read
+  # Lets the job request a short-lived, GitHub-signed OIDC ID token — its
+  # proof of identity when exchanging for a QuikPilot run token at TOKEN_URL,
+  # replacing a run token handed to it as a dispatch input (QUIKTR-805, D12).
+  id-token: write
+
+jobs:
+  quikpilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Handed to the launched package below, never echoed or written to a
+      # file. None of these carry a secret: the package exchanges a GitHub
+      # OIDC token for a run token at TOKEN_URL, then the run token for a
+      # push credential at INSTALLATION_TOKEN_URL — see packages/quikpilot-runner.
+      TOKEN_URL: ${{ inputs.token_url }}
+      INSTALLATION_TOKEN_URL: ${{ inputs.installation_token_url }}
+      CALLBACK_URL: ${{ inputs.callback_url }}
+      PACKET_URL: ${{ inputs.packet_url }}
+      RUN_ID: ${{ inputs.run_id }}
+      # QUIKTR-1084 — only meaningful when MODE is "readiness_check"; the
+      # runner's own entrypoint (index.ts) is what branches on MODE, not this
+      # file, so an ordinary pilot run (MODE unset -> "run") ignores these.
+      MODE: ${{ inputs.mode }}
+      READINESS_TOKEN: ${{ inputs.readiness_token }}
+      READINESS_CALLBACK_URL: ${{ inputs.readiness_callback_url }}
+      SETUP_CMD: ${{ inputs.setup_cmd }}
+      TEST_CMD: ${{ inputs.test_cmd }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Node.js for the QuikPilot runner
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Customer setup steps
+        if: hashFiles('.github/actions/quikpilot-setup/action.yml') != ''
+        uses: ./.github/actions/quikpilot-setup
+
+      - name: Restore downloaded packages
+        id: deps-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/yarn
+            ~/.cache/pip
+            ~/.local/share/pnpm/store
+          key: quikpilot-deps-${{ runner.os }}-${{ hashFiles('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml', 'requirements*.txt', 'poetry.lock', 'Pipfile.lock', 'uv.lock') }}
+          restore-keys: quikpilot-deps-${{ runner.os }}-
+
+      - name: Run QuikPilot
+        run: npx --yes @quikit/quikpilot-runner@9.3.0-rc.48
+
+      - name: Save downloaded packages
+        if: always() && steps.deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/yarn
+            ~/.cache/pip
+            ~/.local/share/pnpm/store
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      - name: Keep the files of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quikpilot-failed-run
+          path: quikpilot-failure/
+          retention-days: 7
+          if-no-files-found: ignore
