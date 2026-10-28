@@ -677,3 +677,10 @@ def test_grouping_as_cte():
 def test_grouping_create_table():
     p = sqlparse.parse("create table db.tbl (a string)")[0].tokens
     assert p[4].value == "db.tbl"
+
+
+def test_grouping_alias_ctas_lowercase_as():
+    # [QP-QTPY-4-1] a lowercase AS marks the alias in CREATE TABLE ... AS SELECT
+    p = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0].tokens
+    assert p[10].get_alias() == 'col1'
+    assert isinstance(p[10].tokens[0], sql.Function)
