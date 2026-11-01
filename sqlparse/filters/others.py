@@ -45,6 +45,11 @@ class StripCommentsFilter:
                 if prev_ is not None and not prev_.match(T.Punctuation, '('):
                     tlist.tokens.insert(tidx, _get_insert_token(token))
                 tlist.tokens.remove(token)
+                if (prev_ is None and next_ is not None
+                        and isinstance(tlist, sql.Identifier)
+                        and not next_.is_whitespace
+                        and not next_.match(T.Punctuation, ')')):
+                    tlist.tokens.insert(tidx, sql.Token(T.Whitespace, ' '))
             else:
                 tlist.tokens[tidx] = _get_insert_token(token)
 
