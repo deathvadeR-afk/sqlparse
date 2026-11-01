@@ -101,6 +101,11 @@ class TestFormat:
         res = sqlparse.format(sql, strip_comments=True)
         assert res == 'select *\n\nfrom foo'
 
+    def test_strip_comments_block_keeps_space(self):
+        sql = 'SELECT 1/*bar*/ AS foo'
+        res = sqlparse.format(sql, strip_comments=True)
+        assert res == 'SELECT 1 AS foo'
+
     def test_strip_ws(self):
         f = lambda sql: sqlparse.format(sql, strip_whitespace=True)
         s = 'select\n* from      foo\n\twhere  ( 1 = 2 )\n'
