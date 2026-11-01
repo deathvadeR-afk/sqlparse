@@ -11,6 +11,17 @@ from sqlparse import sql, tokens as T
 from sqlparse.utils import split_unquoted_newlines
 
 
+def _has_text_before(tlist):
+    """Returns True if the parent group has a non-whitespace token before tlist."""
+    parent = tlist.parent
+    if parent is None:
+        return False
+    idx = parent.token_index(tlist)
+    _, prev_ = parent.token_prev(idx, skip_ws=False)
+    return (prev_ is not None and not prev_.is_whitespace
+            and not prev_.match(T.Punctuation, '('))
+
+
 class StripCommentsFilter:
 
     @staticmethod
@@ -44,6 +55,11 @@ class StripCommentsFilter:
                 # a valid SQL (see #425).
                 if prev_ is not None and not prev_.match(T.Punctuation, '('):
                     tlist.tokens.insert(tidx, _get_insert_token(token))
+                elif (isinstance(token, sql.Comment) and token.value.startswith('/*')
+                        and _has_text_before(tlist)
+                        and next_ is not None and not next_.is_whitespace
+                        and not next_.match(T.Punctuation, ')')):
+                    tlist.tokens.insert(tidx, sql.Token(T.Whitespace, ' '))
                 tlist.tokens.remove(token)
             else:
                 tlist.tokens[tidx] = _get_insert_token(token)
