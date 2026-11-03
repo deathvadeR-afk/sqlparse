@@ -93,18 +93,19 @@ jobs:
       TEST_CMD: ${{ inputs.test_cmd }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Set up Node.js for the QuikPilot runner
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
+          package-manager-cache: false
       - name: Customer setup steps
         if: hashFiles('.github/actions/quikpilot-setup/action.yml') != ''
         uses: ./.github/actions/quikpilot-setup
@@ -137,7 +138,7 @@ jobs:
 
       - name: Keep the files of a failed run
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: quikpilot-failed-run
           path: quikpilot-failure/
