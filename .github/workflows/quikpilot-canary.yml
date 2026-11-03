@@ -1,0 +1,93 @@
+# ============================================================================
+# QuikPilot canary — GENERATED FILE (QUIKTR-2044). Do not edit by hand.
+#
+# Once a week this runs the same actions QuikPilot's own workflow runs (checkout, the language setup, the package cache, the artifact upload),
+# with no AI and no runner, and then reads the notices GitHub attached to that job. GitHub announces deprecations and runner-image changes there
+# (for example 'Node.js 20 is deprecated ... forced to run on Node.js 24'). When one appears this fails, which emails the owner of this repository.
+# It lives only in repositories QuikIT owns; it is never installed in a customer's.
+# ============================================================================
+# templateVersion: 9
+name: QuikPilot canary
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+
+jobs:
+  exercise:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Restore downloaded packages
+        id: deps-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/yarn
+            ~/.cache/pip
+            ~/.local/share/pnpm/store
+          key: quikpilot-deps-${{ runner.os }}-${{ hashFiles('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml', 'requirements*.txt', 'poetry.lock', 'Pipfile.lock', 'uv.lock') }}
+          restore-keys: quikpilot-deps-${{ runner.os }}-
+
+      - name: Nothing to run
+        run: echo "QuikPilot canary - the actions above are what is being checked."
+
+      - name: Save downloaded packages
+        if: always() && steps.deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/yarn
+            ~/.cache/pip
+            ~/.local/share/pnpm/store
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      - name: Exercise the artifact upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: quikpilot-canary
+          path: quikpilot-canary/
+          retention-days: 1
+          if-no-files-found: ignore
+
+  report:
+    needs: exercise
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read what GitHub said about the first job
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          job_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs" --jq '.jobs[] | select(.name == "exercise") | .id')
+          gh api "repos/$GITHUB_REPOSITORY/check-runs/$job_id/annotations" --paginate --jq '.[] | [.annotation_level, .message] | join(": ")' | tee notices.txt
+          {
+            echo '### What GitHub said about the first job'
+            echo
+            if [ -s notices.txt ]; then sed 's/^/- /' notices.txt; else echo none; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if grep -Eiq 'deprecat|forced to run|will migrate|no longer|unsupported|end of life' notices.txt; then
+            echo "::error::GitHub is announcing a change that affects QuikPilot's workflow. See the job summary."
+            exit 1
+          fi
