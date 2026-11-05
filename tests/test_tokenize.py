@@ -241,6 +241,23 @@ def test_parse_tzcast(s):
     assert p.tokens[0].ttype == T.Keyword.TZCast
 
 
+def test_between_dot_numbers_are_number_tokens():
+    # [QP-QTPY-21-1] tokenises .03 and .06 as number tokens in a BETWEEN expression
+    tokens = [t for t in lexer.tokenize('a BETWEEN .03 AND .06') if t[1] in ('.03', '.06')]
+    assert len(tokens) == 2
+    for ttype, _ in tokens:
+        assert ttype in T.Number
+
+
+def test_between_and_keywords_are_not_names():
+    # [QP-QTPY-21-2] tokenises BETWEEN and AND as keyword tokens in a BETWEEN expression
+    tokens = [t for t in lexer.tokenize('a BETWEEN .03 AND .06') if t[1].upper() in ('BETWEEN', 'AND')]
+    assert len(tokens) == 2
+    for ttype, _ in tokens:
+        assert ttype in T.Keyword
+        assert ttype not in T.Name
+
+
 def test_cli_commands():
     p = sqlparse.parse('\\copy')[0]
     assert len(p.tokens) == 1
