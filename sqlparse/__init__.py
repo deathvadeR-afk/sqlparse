@@ -73,3 +73,16 @@ def split(
     """
     stack = engine.FilterStack(strip_semicolon=strip_semicolon)
     return [str(stmt).strip() for stmt in stack.run(sql, encoding)]
+
+
+def count_statements(sql: str, encoding: str | None = None) -> int:
+    """Return the number of statements in *sql*.
+
+    The count is the length of the list :func:`split` returns for the
+    same script, so blank lines between statements add nothing.
+
+    :param sql: A string containing one or more SQL statements.
+    :param encoding: The encoding of the statement (optional).
+    :returns: The number of statements as an integer.
+    """
+    return len(split(sql, encoding))

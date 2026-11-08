@@ -374,3 +374,21 @@ def test_split_standalone_for_update():
     assert stmts[1] == "SELECT 3;"
 
 
+def test_count_statements_two_statements():
+    # [QP-QTPY-19-1] returns 2 for a script with two statements
+    sql = 'select * from foo; select * from bar;'
+    assert sqlparse.count_statements(sql) == 2
+
+
+def test_count_statements_ignores_blank_lines():
+    # [QP-QTPY-19-2] does not count blank lines between statements
+    sql = 'select * from foo;\n\n\nselect * from bar;'
+    assert sqlparse.count_statements(sql) == 2
+
+
+def test_count_statements_matches_split_length():
+    # [QP-QTPY-19-3] matches the number of statements split returns
+    sql = 'select * from foo;\n\n\nselect * from bar;\n\n'
+    assert sqlparse.count_statements(sql) == len(sqlparse.split(sql))
+
+
