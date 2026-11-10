@@ -724,6 +724,28 @@ def test_format_right_margin():
     sqlparse.format('foo', right_margin="79")
 
 
+def test_strip_comments_inline_comment_between_tokens_exact():
+    # QP-QTPY-26-1
+    sql = 'SELECT 1/*bar*/ AS foo'
+    res = sqlparse.format(sql, strip_comments=True)
+    assert res == 'SELECT 1 AS foo'
+
+
+def test_strip_comments_inline_comment_keeps_token_separation():
+    # QP-QTPY-26-2
+    sql = 'SELECT 1/*bar*/ AS foo'
+    res = sqlparse.format(sql, strip_comments=True)
+    assert '1 AS' in res
+    assert '1AS' not in res
+
+
+def test_strip_comments_end_of_line_keeps_linebreak():
+    # QP-QTPY-26-3
+    sql = 'select a -- statement starts here\nfrom foo'
+    res = sqlparse.format(sql, strip_comments=True)
+    assert any(line.startswith('from foo') for line in res.splitlines())
+
+
 def test_format_json_ops():  # issue542
     formatted = sqlparse.format(
         "select foo->'bar', foo->'bar';", reindent=True)
