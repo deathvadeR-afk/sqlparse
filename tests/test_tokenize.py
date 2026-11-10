@@ -57,6 +57,34 @@ def test_tokenize_inline_keywords():
     assert tokens[2][1] == 'join_col'
 
 
+def test_qp_qtpy_25_1_leading_dot_numbers_in_between_are_float():
+    # [QP-QTPY-25-1] Leading-dot numbers in a BETWEEN range are number tokens
+    tokens = [(ttype, value) for ttype, value in lexer.tokenize('a BETWEEN .03 AND .06')
+              if not value.isspace()]
+    assert (T.Number.Float, '.03') in tokens
+    assert (T.Number.Float, '.06') in tokens
+    assert not any(ttype is T.Name and value in ('.03', '.06') for ttype, value in tokens)
+
+
+def test_qp_qtpy_25_2_between_and_stay_keywords_before_leading_dot_numbers():
+    # [QP-QTPY-25-2] BETWEEN and AND stay keywords when followed by leading-dot numbers
+    tokens = [(ttype, value) for ttype, value in lexer.tokenize('a BETWEEN .03 AND .06')
+              if not value.isspace()]
+    between = next(t for t in tokens if t[1] == 'BETWEEN')
+    and_ = next(t for t in tokens if t[1] == 'AND')
+    assert between[0] in T.Keyword
+    assert between[0] is not T.Name
+    assert and_[0] in T.Keyword
+    assert and_[0] is not T.Name
+
+
+def test_qp_qtpy_25_3_spaced_identifier_before_period_is_name():
+    # [QP-QTPY-25-3] Spaced identifier before a period is still a name
+    tokens = list(lexer.tokenize('schema . name'))
+    schema = next(t for t in tokens if t[1] == 'schema')
+    assert schema[0] is T.Name
+
+
 def test_tokenize_negative_numbers():
     s = "values(-1)"
     tokens = list(lexer.tokenize(s))
