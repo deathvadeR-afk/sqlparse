@@ -677,3 +677,52 @@ def test_grouping_as_cte():
 def test_grouping_create_table():
     p = sqlparse.parse("create table db.tbl (a string)")[0].tokens
     assert p[4].value == "db.tbl"
+
+
+def _identifiers_with_alias(stmt, alias):
+    return [t for t in stmt.tokens
+            if isinstance(t, sql.Identifier) and t.get_alias() == alias]
+
+
+def test_ctas_lowercase_as_aliases_function():
+    # QP-QTPY-24-1: lowercase as aliases a coalesce function call as col1
+    p = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0]
+    items = _identifiers_with_alias(p, 'col1')
+    assert len(items) == 1
+    assert isinstance(items[0].tokens[0], sql.Function)
+
+
+def test_ctas_as_spelling_produces_same_table():
+    # QP-QTPY-24-2: lowercase and uppercase AS produce identical tables
+    lower = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0]
+    upper = sqlparse.parse('create table tbl1 AS select coalesce(t1.col1, 0) AS col1 from t1')[0]
+    assert ([type(t) for t in lower.tokens if not t.is_whitespace]
+            == [type(t) for t in upper.tokens if not t.is_whitespace])
+    assert len(_identifiers_with_alias(lower, 'col1')) == 1
+    assert len(_identifiers_with_alias(upper, 'col1')) == 1
+
+
+def test_ctas_mixed_case_as_aliases_function():
+    # QP-QTPY-24-3: mixed-case AS aliases a coalesce function call
+    p = sqlparse.parse('create table tbl1 As select coalesce(t1.col1, 0) As col1 from t1')[0]
+    items = _identifiers_with_alias(p, 'col1')
+    assert len(items) == 1
+    assert isinstance(items[0].tokens[0], sql.Function)
+
+
+def test_ctas_lowercase_as_aliases_plain_column():
+    # QP-QTPY-24-4: lowercase as aliases a plain column in a select list
+    p = sqlparse.parse('create table tbl2 as select t1.col1 as c from t1')[0]
+    items = _identifiers_with_alias(p, 'c')
+    assert len(items) == 1
+    assert items[0].get_real_name() == 'col1'
+
+
+def test_ctas_identifier_starting_with_as_not_alias():
+    # QP-QTPY-24-5: identifier starting with as is not read as an alias keyword
+    p = sqlparse.parse('create table tbl3 as select t1.ascii_code from t1')[0]
+    items = [t for t in p.tokens
+             if isinstance(t, sql.Identifier) and t.get_real_name() == 'ascii_code']
+    assert len(items) == 1
+    assert str(items[0]) == 't1.ascii_code'
+    assert items[0].get_alias() is None
