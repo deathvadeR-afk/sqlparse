@@ -44,6 +44,14 @@ class StripCommentsFilter:
                 # a valid SQL (see #425).
                 if prev_ is not None and not prev_.match(T.Punctuation, '('):
                     tlist.tokens.insert(tidx, _get_insert_token(token))
+                elif (prev_ is None and not isinstance(tlist, sql.Statement)
+                      and next_ is not None and not next_.is_whitespace
+                      and not next_.match(T.Punctuation, ')')):
+                    # A comment that starts a group and is followed directly
+                    # by a token must not join that token to the previous one.
+                    insert_token = _get_insert_token(token)
+                    if insert_token.ttype is T.Whitespace:
+                        tlist.tokens.insert(tidx, insert_token)
                 tlist.tokens.remove(token)
             else:
                 tlist.tokens[tidx] = _get_insert_token(token)
