@@ -84,6 +84,12 @@ class TestFormat:
         res = sqlparse.format(sql, strip_comments=True)
         assert res == 'select (select 2)'
 
+    def test_strip_comments_keeps_space_around_block_comment(self):
+        # [QP-QTPY-31-1] keeps the space around a removed block comment
+        sql = 'SELECT 1/*bar*/ AS foo'
+        res = sqlparse.format(sql, strip_comments=True)
+        assert res == 'SELECT 1 AS foo'
+
     def test_strip_comments_preserves_linebreak(self):
         sql = 'select * -- a comment\r\nfrom foo'
         res = sqlparse.format(sql, strip_comments=True)
