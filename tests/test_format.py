@@ -724,6 +724,12 @@ def test_format_right_margin():
     sqlparse.format('foo', right_margin="79")
 
 
+def test_strip_comments_keeps_space_after_comment():
+    # QP-QTPY-34-1: keeps the space after a stripped comment
+    res = sqlparse.format('SELECT 1/*bar*/ AS foo', strip_comments=True)
+    assert res == 'SELECT 1 AS foo'
+
+
 def test_format_json_ops():  # issue542
     formatted = sqlparse.format(
         "select foo->'bar', foo->'bar';", reindent=True)

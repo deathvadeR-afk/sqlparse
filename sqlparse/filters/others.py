@@ -44,6 +44,13 @@ class StripCommentsFilter:
                 # a valid SQL (see #425).
                 if prev_ is not None and not prev_.match(T.Punctuation, '('):
                     tlist.tokens.insert(tidx, _get_insert_token(token))
+                elif (prev_ is None and next_ is not None
+                      and tlist.parent is not None
+                      and token.value[-1:] in (' ', '\t')
+                      and not next_.is_whitespace
+                      and not next_.match(T.Punctuation, ')')):
+                    # Keep the space that followed the removed comment.
+                    tlist.tokens.insert(tidx, _get_insert_token(token))
                 tlist.tokens.remove(token)
             else:
                 tlist.tokens[tidx] = _get_insert_token(token)
