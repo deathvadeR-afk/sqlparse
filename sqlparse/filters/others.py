@@ -35,9 +35,27 @@ class StripCommentsFilter:
         while token:
             pidx, prev_ = tlist.token_prev(tidx, skip_ws=False)
             nidx, next_ = tlist.token_next(tidx, skip_ws=False)
+            # A block comment that starts its group has no token before it
+            # here. Look at the token before the group in the enclosing group:
+            # if it is a value and the comment has whitespace after it, the
+            # comment becomes one space so the tokens either side stay apart.
+            outer_prev = None
+            if prev_ is None and tlist.parent is not None:
+                gidx = tlist.parent.token_index(tlist)
+                _, outer_prev = tlist.parent.token_prev(gidx, skip_ws=False)
+            keep_space = (
+                prev_ is None and outer_prev is not None
+                and not outer_prev.is_whitespace
+                and not outer_prev.match(T.Punctuation, '(')
+                and token.value.startswith('/*')
+                and next_ is not None
+                and not next_.match(T.Punctuation, ')')
+                and (token.value[-1:].isspace() or next_.is_whitespace))
+            if keep_space:
+                tlist.tokens[tidx] = sql.Token(T.Whitespace, ' ')
             # Replace by whitespace if prev and next exist and if they're not
             # whitespaces. This doesn't apply if prev or next is a parenthesis.
-            if (prev_ is None or next_ is None
+            elif (prev_ is None or next_ is None
                     or prev_.is_whitespace or prev_.match(T.Punctuation, '(')
                     or next_.is_whitespace or next_.match(T.Punctuation, ')')):
                 # Insert a whitespace to ensure the following SQL produces
