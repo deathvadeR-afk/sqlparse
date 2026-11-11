@@ -677,3 +677,28 @@ def test_grouping_as_cte():
 def test_grouping_create_table():
     p = sqlparse.parse("create table db.tbl (a string)")[0].tokens
     assert p[4].value == "db.tbl"
+
+
+def test_grouping_alias_ctas_lowercase_as():
+    # QP-QTPY-38-1: lowercase AS in CREATE TABLE ... AS SELECT
+    p = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0]
+    assert p.tokens[10].get_alias() == 'col1'
+    assert isinstance(p.tokens[10].tokens[0], sql.Function)
+
+
+def test_grouping_alias_ctas_lowercase_matches_uppercase():
+    # QP-QTPY-38-2: lowercase and uppercase AS group the same way
+    lower = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0]
+    upper = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) AS col1 from t1')[0]
+    for p in (lower, upper):
+        assert p.tokens[10].get_alias() == 'col1'
+        assert isinstance(p.tokens[10].tokens[0], sql.Function)
+    assert [type(t).__name__ for t in lower.tokens] == [type(t).__name__ for t in upper.tokens]
+    assert [type(t).__name__ for t in lower.tokens[10].tokens] == [type(t).__name__ for t in upper.tokens[10].tokens]
+
+
+def test_grouping_alias_ctas_uppercase_as():
+    # QP-QTPY-38-3: uppercase AS in CREATE TABLE ... AS SELECT still groups
+    p = sqlparse.parse('CREATE TABLE tbl1 AS SELECT coalesce(t1.col1, 0) AS col1 FROM t1')[0]
+    assert p.tokens[10].get_alias() == 'col1'
+    assert isinstance(p.tokens[10].tokens[0], sql.Function)
