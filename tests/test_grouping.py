@@ -677,3 +677,28 @@ def test_grouping_as_cte():
 def test_grouping_create_table():
     p = sqlparse.parse("create table db.tbl (a string)")[0].tokens
     assert p[4].value == "db.tbl"
+
+
+def test_grouping_alias_ctas_lowercase_as():
+    # QP-QTPY-35-1: lowercase AS groups the coalesce item as a function with alias col1
+    p = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0]
+    assert p.tokens[10].get_alias() == 'col1'
+    assert isinstance(p.tokens[10].tokens[0], sql.Function)
+
+
+def test_grouping_alias_ctas_lowercase_uppercase_same():
+    # QP-QTPY-35-2: lowercase and uppercase AS produce the same grouping
+    lower = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0]
+    upper = sqlparse.parse('create table tbl1 AS select coalesce(t1.col1, 0) AS col1 from t1')[0]
+    assert [type(t) for t in lower.tokens] == [type(t) for t in upper.tokens]
+    assert lower.tokens[10].get_alias() == 'col1'
+    assert isinstance(lower.tokens[10].tokens[0], sql.Function)
+    assert upper.tokens[10].get_alias() == 'col1'
+    assert isinstance(upper.tokens[10].tokens[0], sql.Function)
+
+
+def test_grouping_alias_ctas_mixed_case():
+    # QP-QTPY-35-3: mixed-case AS in CREATE TABLE ... AS SELECT groups the function with its alias
+    p = sqlparse.parse('Create Table tbl1 As Select coalesce(t1.col1, 0) As col1 From t1')[0]
+    assert p.tokens[10].get_alias() == 'col1'
+    assert isinstance(p.tokens[10].tokens[0], sql.Function)
