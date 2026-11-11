@@ -677,3 +677,27 @@ def test_grouping_as_cte():
 def test_grouping_create_table():
     p = sqlparse.parse("create table db.tbl (a string)")[0].tokens
     assert p[4].value == "db.tbl"
+
+
+def test_qp_qtpy_37_1_ctas_coalesce_lowercase_as():
+    # [QP-QTPY-37-1] groups coalesce alias in CTAS with lowercase as
+    p = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0]
+    item = next(t for t in p.tokens if isinstance(t, sql.Identifier) and t.get_alias() == 'col1')
+    assert isinstance(item.tokens[0], sql.Function)
+    assert item.get_alias() == 'col1'
+
+
+def test_qp_qtpy_37_2_ctas_coalesce_uppercase_as():
+    # [QP-QTPY-37-2] groups coalesce alias in CTAS with uppercase as
+    p = sqlparse.parse('CREATE TABLE tbl1 AS SELECT coalesce(t1.col1, 0) AS col1 FROM t1')[0]
+    item = next(t for t in p.tokens if isinstance(t, sql.Identifier) and t.get_alias() == 'col1')
+    assert isinstance(item.tokens[0], sql.Function)
+    assert item.get_alias() == 'col1'
+
+
+def test_qp_qtpy_37_3_ctas_lowercase_as_uppercase_keywords():
+    # [QP-QTPY-37-3] recognises lowercase as in a CREATE TABLE statement with uppercase keywords
+    p = sqlparse.parse('CREATE TABLE tbl1 as SELECT coalesce(t1.col1, 0) as col1 FROM t1')[0]
+    item = next(t for t in p.tokens if isinstance(t, sql.Identifier) and t.get_alias() == 'col1')
+    assert isinstance(item.tokens[0], sql.Function)
+    assert item.get_alias() == 'col1'
