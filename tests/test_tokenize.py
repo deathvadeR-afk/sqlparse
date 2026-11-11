@@ -245,3 +245,20 @@ def test_cli_commands():
     p = sqlparse.parse('\\copy')[0]
     assert len(p.tokens) == 1
     assert p.tokens[0].ttype == T.Command
+
+
+def test_between_and_decimal_range_keywords():
+    # BETWEEN and AND stay keywords when a decimal without a leading zero follows
+    toks = [t for t in lexer.tokenize('a BETWEEN .03 AND .06') if t[1].strip()]
+    between = next(t for t in toks if t[1] == 'BETWEEN')
+    and_kw = next(t for t in toks if t[1] == 'AND')
+    assert between[0] in T.Keyword
+    assert between[0] is not T.Name
+    assert and_kw[0] in T.Keyword
+    assert and_kw[0] is not T.Name
+
+
+def test_decimals_without_leading_zero_are_numbers():
+    # each decimal without a leading zero is one number token, in text order
+    toks = [t for t in lexer.tokenize('a BETWEEN .03 AND .06') if t[0] in T.Number]
+    assert [t[1] for t in toks] == ['.03', '.06']

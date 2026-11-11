@@ -46,6 +46,9 @@ SQL_REGEX = [
 
     (r'(@|##|#)[A-ZÀ-Ü]\w+', tokens.Name),
 
+    # BETWEEN and AND stay keywords when a decimal without a leading zero
+    # follows, e.g. `a BETWEEN .03 AND .06`
+    (r'(BETWEEN|AND)(?=\s+\.\d)', tokens.Keyword),
     # see issue #39
     # Spaces around period `schema . name` are valid identifier
     # TODO: Spaces before period not implemented
