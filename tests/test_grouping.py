@@ -677,3 +677,22 @@ def test_grouping_as_cte():
 def test_grouping_create_table():
     p = sqlparse.parse("create table db.tbl (a string)")[0].tokens
     assert p[4].value == "db.tbl"
+
+
+def test_grouping_lowercase_as_ctas_function_alias():
+    # QP-QTPY-39-1
+    p = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0].tokens
+    assert isinstance(p[10], sql.Identifier)
+    assert isinstance(p[10].tokens[0], sql.Function)
+    assert p[10].get_alias() == 'col1'
+
+
+def test_grouping_lowercase_as_ctas_matches_uppercase():
+    # QP-QTPY-39-2
+    p = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) as col1 from t1')[0].tokens
+    upper = sqlparse.parse('create table tbl1 as select coalesce(t1.col1, 0) AS col1 from t1')[0].tokens
+    functions = [t for t in p[10].tokens if isinstance(t, sql.Function)]
+    assert len(functions) == 1
+    assert str(functions[0]) == 'coalesce(t1.col1, 0)'
+    assert p[10].get_alias() == 'col1'
+    assert p[10].get_alias() == upper[10].get_alias()
