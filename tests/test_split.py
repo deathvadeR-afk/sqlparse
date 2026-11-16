@@ -374,3 +374,56 @@ def test_split_standalone_for_update():
     assert stmts[1] == "SELECT 3;"
 
 
+def test_split_strip_comments_parameter():
+    # QP-QTPY-40-1: strip_comments follows strip_semicolon, defaults to False
+    import inspect
+    params = inspect.signature(sqlparse.split).parameters
+    assert list(params) == ['sql', 'encoding', 'strip_semicolon',
+                            'strip_comments']
+    assert params['strip_comments'].default is False
+
+
+def test_split_strip_comments_false_matches_omitted():
+    # QP-QTPY-40-2: strip_comments=False gives the same list as omitting it
+    sql = 'select 1; -- note\nselect 2;'
+    assert (sqlparse.split(sql, strip_comments=False) ==
+            sqlparse.split(sql))
+
+
+def test_split_strip_comments_removes_comments_keeps_order():
+    # QP-QTPY-40-3: comments removed from each statement, order kept
+    sql = 'select 1; -- note\nselect 2;'
+    assert sqlparse.split(sql, strip_comments=True) == [
+        'select 1;', 'select 2;']
+
+
+def test_split_strip_comments_drops_comment_only_statement():
+    # QP-QTPY-40-4: a statement that is only a comment is dropped
+    assert sqlparse.split('-- only a comment', strip_comments=True) == []
+
+
+def test_split_strip_comments_applies_after_strip_semicolon():
+    # QP-QTPY-40-5: strip_semicolon is applied before comment removal
+    sql = 'select 1; -- note\nselect 2;'
+    expected = [sqlparse.format(item, strip_comments=True).strip()
+                for item in sqlparse.split(sql, strip_semicolon=True)]
+    result = sqlparse.split(sql, strip_semicolon=True, strip_comments=True)
+    assert result == expected
+
+
+def test_split_strip_comments_rejects_string_value():
+    # QP-QTPY-40-6: a string that is not True or False raises SQLParseError
+    from sqlparse.exceptions import SQLParseError
+    with pytest.raises(SQLParseError) as excinfo:
+        sqlparse.split('select 1;', strip_comments='yes')
+    assert str(excinfo.value) == "Invalid value for strip_comments: 'yes'"
+
+
+def test_split_strip_comments_rejects_none_with_repr():
+    # QP-QTPY-40-7: None raises SQLParseError with its repr in the message
+    from sqlparse.exceptions import SQLParseError
+    with pytest.raises(SQLParseError) as excinfo:
+        sqlparse.split('select 1;', strip_comments=None)
+    assert str(excinfo.value) == 'Invalid value for strip_comments: None'
+
+
