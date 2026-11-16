@@ -12,6 +12,7 @@ from collections.abc import Generator
 from typing import IO, Any
 
 from sqlparse import cli, engine, filters, formatter, sql, tokens
+from sqlparse.exceptions import SQLParseError
 
 __version__ = "0.6.1.dev0"
 __all__ = ["cli", "engine", "filters", "formatter", "sql", "tokens"]
@@ -61,7 +62,8 @@ def format(sql: str, encoding: str | None = None, **options: Any) -> str:
 
 
 def split(
-    sql: str, encoding: str | None = None, strip_semicolon: bool = False
+    sql: str, encoding: str | None = None, strip_semicolon: bool = False,
+    strip_comments: bool = False,
 ) -> list[str]:
     """Split *sql* into single statements.
 
@@ -71,5 +73,13 @@ def split(
         (default: False).
     :returns: A list of strings.
     """
+    if strip_comments not in [True, False]:
+        raise SQLParseError('Invalid value for strip_comments: '
+                            f'{strip_comments!r}')
     stack = engine.FilterStack(strip_semicolon=strip_semicolon)
-    return [str(stmt).strip() for stmt in stack.run(sql, encoding)]
+    statements = [str(stmt).strip() for stmt in stack.run(sql, encoding)]
+    if strip_comments:
+        statements = [format(stmt, strip_comments=True).strip()
+                      for stmt in statements]
+        statements = [stmt for stmt in statements if stmt]
+    return statements
